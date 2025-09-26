@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 
 import aiohttp
 
-from nice_go._exceptions import ReconnectWebSocketError, WebSocketError
+from nice_go._exceptions import ReconnectWebSocketError, WebSocketError, NoAuthError
 from nice_go._util import get_request_template
 
 if TYPE_CHECKING:
@@ -144,7 +144,8 @@ class WebSocketClient:
         """Initialize the WebSocket connection.
 
         Raises:
-            WebSocketError: If the WebSocket connection is closed or an error occurs.
+            NoAuthError: If the WebSocket connection error is Unauthorized Exception.
+            WebSocketError: If the WebSocket connection is closed or a different error occurs.
         """
         if self.ws is None or self.ws.closed:
             msg = "WebSocket connection is closed"
@@ -156,6 +157,13 @@ class WebSocketClient:
             message = await self.ws.receive(timeout=10)
             data = json.loads(message.data)
             _LOGGER.debug("Received message: %s", data)
+
+            if data["type"] == "connection_error":
+                error = data["payload"]["errors"][0]
+                if error["errorType"] == "Unauthorized Exception":
+                    _LOGGER.debug("Received UnauthorizedException error")
+                    raise NoAuthError
+
             if data["type"] != "connection_ack":
                 msg = f'Expected connection_ack, but received {data["type"]}'
                 raise WebSocketError(

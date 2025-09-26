@@ -250,6 +250,20 @@ async def test_connect_error(mock_api: NiceGOApi) -> None:
         assert mock_ws_client_instance.connect.call_count == expected_call_count
 
 
+async def test_connect_no_auth(mock_api: NiceGOApi) -> None:
+    mock_api.id_token = "test_token"
+
+    with patch("nice_go.nice_go_api.WebSocketClient") as mock_ws_client:
+        mock_ws_client_instance = AsyncMock()
+        mock_ws_client.return_value = mock_ws_client_instance
+
+        mock_ws_client_instance.connect.side_effect = NoAuthError()
+
+        with pytest.raises(NoAuthError):
+            await mock_api.connect()
+        assert mock_ws_client_instance.connect.call_count == 1
+
+
 async def test_connect_closed(mock_api: NiceGOApi) -> None:
     mock_api.id_token = "test_token"
 

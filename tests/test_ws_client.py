@@ -10,7 +10,7 @@ import aiohttp
 import pytest
 import yarl
 
-from nice_go import WebSocketError
+from nice_go import WebSocketError, NoAuthError
 from nice_go._exceptions import ReconnectWebSocketError
 from nice_go._ws_client import EventListener, WebSocketClient
 
@@ -38,6 +38,22 @@ async def test_ws_connect(mock_ws_client: WebSocketClient) -> None:
     mock_ws_client._dispatch.assert_called_once()
     mock_ws_client.ws.receive.assert_called_once()
     mock_ws_client.ws.send_json.assert_called_once()
+
+
+async def test_ws_init_unauthorized_error(mock_ws_client: WebSocketClient) -> None:
+    assert mock_ws_client.ws is not None
+    assert isinstance(mock_ws_client.ws, AsyncMock)
+    mock_ws_client.ws.receive = AsyncMock()
+    mock_ws_client.ws.receive.return_value = MagicMock(
+        data=json.dumps(
+            {
+                "type": "connection_error",
+                "payload": {"errors": [{"errorType": "Unauthorized Exception"}]},
+            },
+        ),
+    )
+    with pytest.raises(NoAuthError):
+        await mock_ws_client.init()
 
 
 async def test_ws_init_unexpected_type(mock_ws_client: WebSocketClient) -> None:

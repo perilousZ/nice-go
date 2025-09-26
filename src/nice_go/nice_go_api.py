@@ -426,7 +426,7 @@ class NiceGOApi:
             reconnect (bool): Whether to reconnect if the connection is lost.
 
         Raises:
-            NoAuthError: If the ID token is not available.
+            NoAuthError: If the ID token is not available or if an Unauthorized exception occurs.
             ApiError: If an API error occurs.
             WebSocketError: If an error occurs while connecting.
         """
@@ -478,9 +478,7 @@ class NiceGOApi:
                 )
 
             with contextlib.suppress(UnboundLocalError):
-                if exceptions := [
-                    task.exception() for task in done if task.exception()
-                ]:
+                if exceptions := [task.exception() for task in done if task.exception()]:
                     for p in pending:
                         p.cancel()
                     # Make sure both WS are closed
@@ -493,6 +491,7 @@ class NiceGOApi:
             aiohttp.ClientError,
             asyncio.TimeoutError,
             ReconnectWebSocketError,
+            NoAuthError,
         ) as e:
             self._dispatch("connection_lost", {"exception": e})
             self._device_connected = False
@@ -505,7 +504,10 @@ class NiceGOApi:
             if self.closed:
                 return
 
-            _LOGGER.debug("Connection lost, retrying...")
+            if isinstance(e, NoAuthError):
+                _LOGGER.debug("Unauthorized exception, trigginer reauthorization...")
+            else:
+                _LOGGER.debug("Connection lost, retrying...")
 
             # Raising triggers retry
             raise
